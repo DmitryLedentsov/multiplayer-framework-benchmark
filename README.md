@@ -63,6 +63,12 @@ make full
 
 Полный план по умолчанию: 4 runtime × 7 session levels × 10 repetitions = 280 fresh-JVM runs; warm-up 120 s и measurement 180 s на run. Это длинный научный прогон, не demo-команда.
 
+## Проверка сборки
+
+Публичный GitHub Actions CI проверяет Python controller/analysis и Java harness вместе с S1/S2/Pekko. Адаптер реального Multiplayer Framework расположен в отдельном Maven source profile `framework`, потому что SUT package связан с приватным репозиторием и недоступен repository-scoped token публичной benchmark-репы.
+
+Полный production-like build выполняется Docker/DPM командой с `-Pframework` и BuildKit secret `maven_settings`. Таким образом публичный CI остаётся воспроизводимым, а приватный SUT не копируется в benchmark-репозиторий.
+
 ## DPM deployment
 
 Репозиторий содержит стандартный `compose.yml`, поэтому добавляется в DPM как обычный project:
