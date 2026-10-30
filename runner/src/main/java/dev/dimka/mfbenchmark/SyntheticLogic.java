@@ -26,8 +26,14 @@ public final class SyntheticLogic {
       expectedTickNanos = nowNanos;
       nextPublicationNanos = nowNanos;
     }
-    recorder.step(Math.max(0L, nowNanos - expectedTickNanos));
-    expectedTickNanos += tickIntervalNanos;
+    long lateness = Math.max(0L, nowNanos - expectedTickNanos);
+    recorder.step(lateness);
+    // Measure the missed opportunity, then rebase the next deadline when the
+    // session fell more than one target interval behind. One delayed step
+    // must not turn into permanent artificial deadline debt.
+    expectedTickNanos = lateness > tickIntervalNanos
+        ? nowNanos + tickIntervalNanos
+        : expectedTickNanos + tickIntervalNanos;
     ticks++;
     checksum ^= (ticks * 31L) + Long.rotateLeft(checksum, 7);
 

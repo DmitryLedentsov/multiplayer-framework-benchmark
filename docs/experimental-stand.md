@@ -83,7 +83,7 @@ WebSocket/STOMP намеренно исключён из scheduler benchmark. Э
 ## 6. Операциональные метрики
 
 - **Action latency:** `System.nanoTime()` от успешного admission Action до входа в session callback, ms; p50/p95/p99.
-- **Step lateness:** положительная разница между фактическим началом session step и ожидаемым 50 Hz deadline, ms; p50/p95/p99.
+- **Step lateness:** положительная разница между фактическим началом session step и ожидаемым 50 Hz deadline, ms; p50/p95/p99. Если текущий step опоздал больше чем на один target interval, lateness этого step сохраняется, но reference deadline следующего step rebased; один пропуск не превращается в постоянный искусственный «долг».
 - **Throughput:** число выполненных Actions / длительность measurement window, Actions/s.
 - **Rejection rate:** rejected / offered Actions.
 - **Backlog:** accepted - processed Actions; дополнительно оценивается наклон backlog за последние samples.
