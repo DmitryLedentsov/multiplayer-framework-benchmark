@@ -34,9 +34,10 @@ public final class RunnerMain {
       try (ActionGenerator generator = new ActionGenerator(config, runtime, recorder)) {
         generator.start();
         sleepSeconds(config.warmupSeconds());
-        recorder.reset();
         long measurementStart = System.nanoTime();
+        recorder.startMeasurement(measurementStart);
         double generatorCpuPercent = sample(config, recorder, runtime, generator, measurementStart);
+        recorder.stopMeasurement();
         generator.close();
         double elapsed = (System.nanoTime() - measurementStart) / 1_000_000_000.0;
         MeasurementRecorder.Snapshot finalSnapshot = recorder.snapshot(cpuPercent(), heapUsed(), threadCount(), elapsed);

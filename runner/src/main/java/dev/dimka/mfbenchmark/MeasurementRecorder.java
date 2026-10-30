@@ -14,31 +14,45 @@ public final class MeasurementRecorder {
   private final LongAdder processed = new LongAdder();
   private final LongAdder steps = new LongAdder();
   private final LongAdder publications = new LongAdder();
+  private volatile boolean measuring;
+  private volatile long measurementStartNanos = Long.MAX_VALUE;
 
-  public void reset() {
+  public void startMeasurement(long startNanos) {
+    measuring = false;
     actionLatencyUs.reset();
     stepLatenessUs.reset();
     offered.reset(); accepted.reset(); rejected.reset(); processed.reset(); steps.reset(); publications.reset();
+    measurementStartNanos = startNanos;
+    measuring = true;
   }
 
-  public void offered(boolean ok) {
+  public void stopMeasurement() {
+    measuring = false;
+  }
+
+  public void offered(long enqueuedNanos, boolean ok) {
+    if (!measuring || enqueuedNanos < measurementStartNanos) return;
     offered.increment();
     if (ok) accepted.increment(); else rejected.increment();
   }
 
   public void actionProcessed(long enqueuedNanos, long nowNanos) {
+    if (!measuring || enqueuedNanos < measurementStartNanos) return;
     long us = Math.max(1L, Math.min(MAX_US, (nowNanos - enqueuedNanos) / 1_000L));
     actionLatencyUs.recordValue(us);
     processed.increment();
   }
 
   public void step(long latenessNanos) {
+    if (!measuring) return;
     long us = Math.max(1L, Math.min(MAX_US, latenessNanos / 1_000L));
     stepLatenessUs.recordValue(us);
     steps.increment();
   }
 
-  public void publication() { publications.increment(); }
+  public void publication() {
+    if (measuring) publications.increment();
+  }
 
   public Snapshot snapshot(double processCpuPercent, long heapUsedBytes, int threadCount, double elapsedSeconds) {
     long acceptedCount = accepted.sum();

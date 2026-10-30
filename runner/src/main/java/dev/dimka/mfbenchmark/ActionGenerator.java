@@ -52,7 +52,7 @@ final class ActionGenerator implements AutoCloseable {
         sequence += config.producerThreads();
         long enqueued = System.nanoTime();
         boolean ok = runtime.offerAction(session, enqueued);
-        recorder.offered(ok);
+        recorder.offered(enqueued, ok);
       }
       window++;
     }
