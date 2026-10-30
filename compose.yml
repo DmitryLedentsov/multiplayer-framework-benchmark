@@ -1,0 +1,48 @@
+services:
+  benchmark:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      secrets:
+        - maven_settings
+    environment:
+      BENCHMARK_BASE_PATH: /benchmark
+      BENCHMARK_RESULTS_DIR: /data/results
+      BENCHMARK_RUNNER_JAR: /app/benchmark-runner.jar
+      BENCHMARK_JAVA_OPTS: "-Xms4g -Xmx4g -XX:+UseG1GC"
+      MF_COORDINATE: "com.mf:mf-game-service-starter:0.5.0-SNAPSHOT"
+      BENCHMARK_SOURCE_COMMIT: "${BENCHMARK_SOURCE_COMMIT:-unknown}"
+    volumes:
+      - benchmark-results:/data/results
+    cpus: "${BENCHMARK_CPUS:-4.0}"
+    mem_limit: "${BENCHMARK_MEMORY_LIMIT:-7g}"
+    expose:
+      - "8080"
+    healthcheck:
+      test: ["CMD", "python3", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/benchmark/api/health', timeout=3)"]
+      interval: 10s
+      timeout: 4s
+      retries: 20
+      start_period: 20s
+    networks:
+      - default
+      - dpm-proxy
+    labels:
+      dpm.role: benchmark
+      dpm.url: "${PUBLIC_URL:-http://localhost}/benchmark"
+      traefik.enable: "true"
+      traefik.docker.network: dpm-proxy
+      traefik.http.routers.mf-benchmark.rule: "PathPrefix(`/benchmark`)"
+      traefik.http.routers.mf-benchmark.entrypoints: web
+      traefik.http.services.mf-benchmark.loadbalancer.server.port: "8080"
+
+volumes:
+  benchmark-results:
+
+networks:
+  dpm-proxy:
+    external: true
+
+secrets:
+  maven_settings:
+    file: "${MAVEN_SETTINGS_FILE:-/etc/tank-game/maven-settings.xml}"

@@ -1,0 +1,19 @@
+{
+  "name": "aa-mf-500",
+  "runtimes": ["mf"],
+  "session_levels": [500],
+  "action_rate": 10000,
+  "tick_rate": 50,
+  "publication_rate": 20,
+  "workers": 4,
+  "capacity": 2048,
+  "budget": 256,
+  "warmup_seconds": 30,
+  "measurement_seconds": 60,
+  "repetitions": 10,
+  "producer_threads": 2,
+  "sample_interval_ms": 1000,
+  "randomize_order": true,
+  "order_seed": 20261105,
+  "mode": "aa"
+}

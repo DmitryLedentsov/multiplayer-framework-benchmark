@@ -1,0 +1,19 @@
+{
+  "name": "smoke",
+  "runtimes": ["mf", "s1", "s2", "pekko"],
+  "session_levels": [50, 100],
+  "action_rate": 2000,
+  "tick_rate": 50,
+  "publication_rate": 20,
+  "workers": 4,
+  "capacity": 2048,
+  "budget": 256,
+  "warmup_seconds": 5,
+  "measurement_seconds": 10,
+  "repetitions": 1,
+  "producer_threads": 2,
+  "sample_interval_ms": 1000,
+  "randomize_order": false,
+  "order_seed": 20261105,
+  "mode": "factorial"
+}

@@ -1,0 +1,7 @@
+results/
+**/target/
+__pycache__/
+*.pyc
+.env
+.idea/
+.vscode/
