@@ -64,7 +64,17 @@ class Orchestrator:
                 run_config={"runtime":item["runtime"],"sessions":item["sessions"],"actionRate":request.action_rate,"tickRate":request.tick_rate,"publicationRate":request.publication_rate,"workers":request.workers,"capacity":request.capacity,"budget":request.budget,"warmupSeconds":request.warmup_seconds,"measurementSeconds":request.measurement_seconds,"producerThreads":request.producer_threads,"sampleIntervalMs":request.sample_interval_ms,"outputDir":str(run_dir)}
                 atomic_json(run_dir/"run-config.json",run_config)
                 atomic_json(directory/"status.json",{"status":"running","completedRuns":completed,"failedRuns":failed,"totalRuns":len(plan),"currentRun":{**item,"name":run_name},"updatedAt":utc_now()})
-                rc=self._run_child(run_dir); completed += 1 if rc==0 else 0; failed += 1 if rc!=0 else 0; write_checksums(run_dir)
+                rc=self._run_child(run_dir)
+                if rc != 0 and not (run_dir / "summary.json").exists():
+                    atomic_json(run_dir / "summary.json", {
+                        "status": "failed",
+                        "runtime": item["runtime"],
+                        "config": run_config,
+                        "error": f"child JVM exited with code {rc} before writing summary"
+                    })
+                completed += 1 if rc == 0 else 0
+                failed += 1 if rc != 0 else 0
+                write_checksums(run_dir)
             final_status="stopped" if self._stop.is_set() else ("completed_with_failures" if failed else "completed")
             atomic_json(directory/"status.json",{"status":final_status,"completedRuns":completed,"failedRuns":failed,"totalRuns":len(plan),"currentRun":None,"updatedAt":utc_now()})
             if completed: subprocess.run(["python3",str(self.analysis_script),str(directory)],check=False,timeout=120)

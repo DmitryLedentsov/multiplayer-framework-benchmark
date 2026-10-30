@@ -87,7 +87,7 @@ WebSocket/STOMP намеренно исключён из scheduler benchmark. Э
 - **Throughput:** число выполненных Actions / длительность measurement window, Actions/s.
 - **Rejection rate:** rejected / offered Actions.
 - **Backlog:** accepted - processed Actions; дополнительно оценивается наклон backlog за последние samples.
-- **CPU:** process CPU load всей benchmark JVM, % host CPU budget. Поскольку генератор находится в той же JVM, его CPU дополнительно измеряется отдельно.
+- **CPU:** process CPU load всей benchmark JVM, % host CPU budget; для run используется медиана секундных samples за measurement window, а не последний snapshot. Поскольку генератор находится в той же JVM, его CPU дополнительно измеряется отдельно.
 - **Generator CPU:** CPU producer threads, нормированный к доступному CPU budget, %.
 - **Heap:** used JVM heap, bytes.
 - **Threads:** JVM live thread count.
@@ -116,7 +116,7 @@ Load point считается устойчивым, если медианный 
 2. **A/A:** `configs/aa.json`; одинаковый MF workload, 10 runs. Значимое систематическое расхождение требует поиска дрейфа окружения/нагрузки.
 3. **Generator sanity:** `offeredActions` должен соответствовать заданному Action rate; рост backlog или недобор offered load фиксируется в raw samples. `generator_cpu_percent` измеряется отдельно по producer threads; run не используется для сравнения, если генератор сам не способен сформировать заданный offered load.
 4. **Clock:** latency измеряется монотонным `System.nanoTime()`, а wall clock используется только для метаданных.
-5. **Failure transparency:** child JVM failure не уничтожает experiment; run получает log/summary и experiment завершается `completed_with_failures`.
+5. **Failure transparency:** child JVM failure не уничтожает experiment; run получает log/summary и experiment завершается `completed_with_failures`. Если JVM завершилась до записи собственного summary (например, external kill/OOM), controller создаёт synthetic failure-summary с exit code, поэтому failed run не исчезает из анализа.
 
 ## 9. Угрозы валидности и меры
 

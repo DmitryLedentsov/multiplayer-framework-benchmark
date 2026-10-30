@@ -44,11 +44,20 @@ def median_ci(values: list[float], seed: int, rounds: int = 4000) -> tuple[float
     )
 
 
-def backlog_slope(path: Path, last_n: int = 30) -> float:
+def read_samples(path: Path) -> list[dict[str, str]]:
     if not path.exists():
-        return 0.0
+        return []
     with path.open(encoding="utf-8") as handle:
-        rows = list(csv.DictReader(handle))[-last_n:]
+        return list(csv.DictReader(handle))
+
+
+def sample_median(rows: list[dict[str, str]], name: str, fallback: float) -> float:
+    values = [float(row[name]) for row in rows if row.get(name) not in (None, "")]
+    return statistics.median(values) if values else fallback
+
+
+def backlog_slope(path: Path, last_n: int = 30) -> float:
+    rows = read_samples(path)[-last_n:]
     if len(rows) < 2:
         return 0.0
 
@@ -93,7 +102,15 @@ def load_runs(root: Path) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
             continue
 
         metrics = summary["metrics"]
-        slope = backlog_slope(summary_path.parent / "samples.csv")
+        samples_path = summary_path.parent / "samples.csv"
+        samples = read_samples(samples_path)
+        slope = backlog_slope(samples_path)
+        process_cpu = sample_median(samples, "cpu_percent", float(metrics["processCpuPercent"]))
+        generator_cpu = sample_median(
+            samples,
+            "generator_cpu_percent",
+            float(summary.get("generatorCpuPercent", -1.0)),
+        )
         offered = int(metrics["offeredActions"])
         rejected = int(metrics["rejectedActions"])
         rejection_rate = rejected / offered if offered else 0.0
@@ -120,8 +137,8 @@ def load_runs(root: Path) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
                 "repetition": repetition,
                 "actionP99Ms": float(metrics["actionP99Ms"]),
                 "stepP99Ms": float(metrics["stepP99Ms"]),
-                "cpuPercent": float(metrics["processCpuPercent"]),
-                "generatorCpuPercent": float(summary.get("generatorCpuPercent", -1.0)),
+                "cpuPercent": process_cpu,
+                "generatorCpuPercent": generator_cpu,
                 "actionsPerSecond": float(metrics["actionsPerSecond"]),
                 "rejectionRate": rejection_rate,
                 "tickFraction": tick_fraction,
