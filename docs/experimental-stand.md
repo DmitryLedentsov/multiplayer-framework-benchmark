@@ -34,18 +34,21 @@ flowchart LR
 
 ## 3. Компоненты
 
-| Компонент | Роль | Технология / версия | Обоснование |
-|---|---|---|---|
-| Web/controller | Оркестрация, randomization, история | Python 3.10+, FastAPI 0.162.0 | Контроллер не участвует в scheduler hot path и только создаёт дочерние JVM |
-| Runner | Один независимый прогон | Java 17 | Совпадает с платформой SUT |
-| Multiplayer Framework | Основной SUT | Maven `com.mf:mf-game-service-starter:0.5.0-SNAPSHOT` до выпуска фиксированного release | Используется фактический runtime-код, а не модель |
-| S1 | Baseline | Java single-thread scheduled executor/session | Наивная сериализация с execution resource per session |
-| S2 | Baseline | Java fixed shared pool + serial queue/session | Ближайшая generic-executor альтернатива |
-| S3 | Baseline | Apache Pekko 1.7.1 | Actor-style serialized execution на общем dispatcher |
-| Histogram | Percentiles | HdrHistogram 2.2.2 | Корректное накопление распределений latency без хранения каждого события |
-| Storage | Raw data | persistent Docker volume | Результаты не удаляются при redeploy |
-| Analysis | Статистика | Python stdlib | Median, min-max, deterministic bootstrap 95% CI; A/A permutation test |
-| DPM | Deployment | Dimka Project Manager + Docker Compose | Git commit + Compose являются deployment source of truth |
+| Компонент | Роль | Технология / версия | Контейнер / образ | Обоснование |
+|---|---|---|---|---|
+| Web/controller | Оркестрация, randomization, история | Python 3.10+, FastAPI 0.162.0 | `eclipse-temurin:17-jre-jammy` + Python packages | Контроллер не участвует в scheduler hot path и только создаёт дочерние JVM |
+| Runner | Один независимый прогон | Java 17 | `eclipse-temurin:17-jre-jammy` | Совпадает с платформой SUT |
+| Build stage | Воспроизводимая сборка runner | Maven 3.9.9 / Temurin 17 | `maven:3.9.9-eclipse-temurin-17` | Сборка отделена от runtime image |
+| Multiplayer Framework | Основной SUT | Maven `com.mf:mf-game-service-starter:0.5.0-SNAPSHOT` до выпуска фиксированного release | внутри runner JVM | Используется фактический runtime-код, а не модель |
+| S1 | Baseline | Java single-thread scheduled executor/session | внутри runner JVM | Наивная сериализация с execution resource per session |
+| S2 | Baseline | Java fixed shared pool + serial queue/session | внутри runner JVM | Ближайшая generic-executor альтернатива |
+| S3 | Baseline | Apache Pekko 1.7.1 | внутри runner JVM | Actor-style serialized execution на общем dispatcher |
+| Histogram | Percentiles | HdrHistogram 2.2.2 | внутри runner JVM | Накопление распределений latency без хранения каждого события |
+| Storage | Raw data | persistent Docker volume | named volume `benchmark-results` | Результаты не удаляются при redeploy |
+| Analysis | Статистика | Python stdlib | benchmark runtime image | Median, min-max, deterministic bootstrap 95% CI; A/A permutation test |
+| DPM | Deployment | Dimka Project Manager + Docker Compose | host control plane | Git commit + Compose являются deployment source of truth |
+
+Перед финальными прогонами image tags следует дополнительно зафиксировать digest-ами и записать их в manifest.
 
 **Важно:** пока SUT публикуется как `0.5.0-SNAPSHOT`, полная reproducibility ограничена изменяемостью snapshot-артефакта. Перед итоговыми прогонами ВКР необходимо выпустить фиксированный Maven release/tag и заменить координату в `runner/pom.xml`.
 
@@ -84,7 +87,8 @@ WebSocket/STOMP намеренно исключён из scheduler benchmark. Э
 - **Throughput:** число выполненных Actions / длительность measurement window, Actions/s.
 - **Rejection rate:** rejected / offered Actions.
 - **Backlog:** accepted - processed Actions; дополнительно оценивается наклон backlog за последние samples.
-- **CPU:** process CPU load JVM, % host CPU budget.
+- **CPU:** process CPU load всей benchmark JVM, % host CPU budget. Поскольку генератор находится в той же JVM, его CPU дополнительно измеряется отдельно.
+- **Generator CPU:** CPU producer threads, нормированный к доступному CPU budget, %.
 - **Heap:** used JVM heap, bytes.
 - **Threads:** JVM live thread count.
 - **Achieved tick fraction:** observed steps/s / (`sessions × target Hz`).
@@ -109,7 +113,7 @@ Load point считается устойчивым, если медианный 
 
 1. **Smoke:** проверяет, что все четыре runtime запускаются и сохраняют артефакты.
 2. **A/A:** `configs/aa.json`; одинаковый MF workload, 10 runs. Значимое систематическое расхождение требует поиска дрейфа окружения/нагрузки.
-3. **Generator sanity:** `offeredActions` должен соответствовать заданному Action rate; рост backlog или недобор offered load фиксируется в raw samples.
+3. **Generator sanity:** `offeredActions` должен соответствовать заданному Action rate; рост backlog или недобор offered load фиксируется в raw samples. `generator_cpu_percent` измеряется отдельно по producer threads; run не используется для сравнения, если генератор сам не способен сформировать заданный offered load.
 4. **Clock:** latency измеряется монотонным `System.nanoTime()`, а wall clock используется только для метаданных.
 5. **Failure transparency:** child JVM failure не уничтожает experiment; run получает log/summary и experiment завершается `completed_with_failures`.
 
@@ -119,7 +123,7 @@ Load point считается устойчивым, если медианный 
 |---|---|
 | Фоновые процессы на общей VM | Остановить остальные DPM projects или использовать dedicated VM; рандомизировать порядок |
 | JIT/GC warm-up | 120 s warm-up; fresh JVM; фиксированный heap/GC |
-| Генератор становится bottleneck | Параллельные producer threads; offered rate и backlog сохраняются в raw data |
+| Генератор становится bottleneck | Параллельные producer threads; offered rate, generator CPU и backlog сохраняются в raw data; run отбрасывается при недостижении offered load |
 | Неэквивалентность baseline | Одинаковые session callback arithmetic, C/B, tick/publication cadence и offered trace; отличается scheduling model |
 | Snapshot dependency меняется | Перед финальными runs заменить SNAPSHOT фиксированным release/tag |
 | Synthetic workload не равен реальной игре | Ограничить external-validity claim; отдельно возможно добавить `tank-game` workload |
@@ -128,7 +132,7 @@ Load point считается устойчивым, если медианный 
 
 ## 10. Воспроизводимость
 
-Код фиксируется Git commit/tag; зависимости - точными Maven/Python версиями; окружение - Dockerfile/Compose; параметры - JSON config; randomization seed - в manifest; запуск - Makefile/API; raw data и metadata - persistent volume; checksums - SHA-256; CI собирает runner и тестирует controller.
+Код фиксируется Git commit/tag; зависимости - точными Maven/Python версиями; окружение - Dockerfile/Compose; параметры - JSON config; randomization seed - в manifest; запуск - Makefile/API; raw data и metadata - persistent volume; checksums - SHA-256; Публичный CI собирает и тестирует controller и самодостаточную часть Java harness/baselines. MF-adapter компилируется Docker/DPM build с профилем `-Pframework`, потому что SUT package приватный и требует серверный Maven credential.
 
 Сценарий независимой проверки:
 

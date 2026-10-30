@@ -2,7 +2,7 @@
 
 - **SUT:** реальный Multiplayer Framework runtime + matched baselines.
 - **Источник воздействия:** Java Action generator с фиксируемым offered rate.
-- **Сбор измерений:** HdrHistogram + JVM/OS MXBeans + per-second raw samples.
+- **Сбор измерений:** HdrHistogram + JVM/OS MXBeans + per-second raw samples, включая отдельный CPU load-generator threads.
 - **Хранилище:** persistent volume, run manifest, raw CSV, summary, logs, SHA-256.
 - **Анализ:** `scripts/analyze.py`.
 - **Архитектура как код:** `docs/architecture.mmd` (Mermaid).
@@ -11,7 +11,7 @@
 - **Случайность:** order seed фиксируется в manifest; workload распределяется детерминированно.
 - **Одна команда:** `make smoke`, `make aa`, `make full` после deployment.
 - **Метаданные:** environment snapshot + runtime package versions + run config.
-- **CI:** Python tests + Java Maven build/tests.
+- **CI:** Python tests + public Java harness/baseline build/tests; полный MF-adapter валидируется Docker/DPM build с приватным Maven credential.
 - **Повторения:** full = 10 на configuration.
 - **Warm-up/measurement:** 120 s / 180 s full plan.
 - **Порядок:** deterministic randomized order.

@@ -58,6 +58,10 @@ final class ActionGenerator implements AutoCloseable {
     }
   }
 
+  List<Long> threadIds() {
+    return threads.stream().map(Thread::getId).toList();
+  }
+
   @Override public void close() throws InterruptedException {
     running.set(false);
     for (Thread thread : threads) thread.join(1_000L);

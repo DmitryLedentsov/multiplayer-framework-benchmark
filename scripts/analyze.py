@@ -24,18 +24,18 @@ def load_runs(root):
         d=read_json(sp)
         if d.get('status')!='completed':continue
         c=d['config'];m=d['metrics'];slope=backlog_slope(sp.parent/'samples.csv');rr=m['rejectedActions']/m['offeredActions'] if m['offeredActions'] else 0.;exp=c['sessions']*c['tickRate'];tf=m['stepsPerSecond']/exp if exp else 1.;sus=m['stepP99Ms']<10 and m['actionP99Ms']<30 and rr<=.001 and tf>=.98 and slope<=1
-        out.append({'runtime':d['runtime'],'sessions':c['sessions'],'repetition':int(sp.parent.name.rsplit('-r',1)[-1]),'actionP99Ms':m['actionP99Ms'],'stepP99Ms':m['stepP99Ms'],'cpuPercent':m['processCpuPercent'],'actionsPerSecond':m['actionsPerSecond'],'rejectionRate':rr,'tickFraction':tf,'backlogSlope':slope,'sustained':sus})
+        out.append({'runtime':d['runtime'],'sessions':c['sessions'],'repetition':int(sp.parent.name.rsplit('-r',1)[-1]),'actionP99Ms':m['actionP99Ms'],'stepP99Ms':m['stepP99Ms'],'cpuPercent':m['processCpuPercent'],'generatorCpuPercent':float(d.get('generatorCpuPercent',-1.0)),'actionsPerSecond':m['actionsPerSecond'],'rejectionRate':rr,'tickFraction':tf,'backlogSlope':slope,'sustained':sus})
     return out
 def group_runs(runs,seed):
     g=defaultdict(list)
     for r in runs:g[(r['runtime'],r['sessions'])].append(r)
     out=[]
     for idx,((runtime,sessions),rows) in enumerate(sorted(g.items())):
-        vals=lambda k:[float(r[k]) for r in rows];a=vals('actionP99Ms');s=vals('stepP99Ms');cpu=vals('cpuPercent');t=vals('actionsPerSecond')
-        out.append({'runtime':runtime,'sessions':sessions,'n':len(rows),'actionP99Median':statistics.median(a),'actionP99Min':min(a),'actionP99Max':max(a),'actionP99Ci95':median_ci(a,seed+idx*11+1),'stepP99Median':statistics.median(s),'stepP99Min':min(s),'stepP99Max':max(s),'stepP99Ci95':median_ci(s,seed+idx*11+2),'cpuMedian':statistics.median(cpu),'cpuMin':min(cpu),'cpuMax':max(cpu),'cpuCi95':median_ci(cpu,seed+idx*11+3),'actionsPerSecondMedian':statistics.median(t),'actionsPerSecondMin':min(t),'actionsPerSecondMax':max(t),'actionsPerSecondCi95':median_ci(t,seed+idx*11+4),'rejectionRateMedian':statistics.median(vals('rejectionRate')),'tickFractionMedian':statistics.median(vals('tickFraction')),'backlogSlopeMedian':statistics.median(vals('backlogSlope')),'sustainedRuns':sum(r['sustained'] for r in rows),'sustained':sum(r['sustained'] for r in rows)>=math.ceil(len(rows)/2)})
+        vals=lambda k:[float(r[k]) for r in rows];a=vals('actionP99Ms');s=vals('stepP99Ms');cpu=vals('cpuPercent');gen=vals('generatorCpuPercent');t=vals('actionsPerSecond')
+        out.append({'runtime':runtime,'sessions':sessions,'n':len(rows),'actionP99Median':statistics.median(a),'actionP99Min':min(a),'actionP99Max':max(a),'actionP99Ci95':median_ci(a,seed+idx*11+1),'stepP99Median':statistics.median(s),'stepP99Min':min(s),'stepP99Max':max(s),'stepP99Ci95':median_ci(s,seed+idx*11+2),'cpuMedian':statistics.median(cpu),'cpuMin':min(cpu),'cpuMax':max(cpu),'cpuCi95':median_ci(cpu,seed+idx*11+3),'generatorCpuMedian':statistics.median(gen),'actionsPerSecondMedian':statistics.median(t),'actionsPerSecondMin':min(t),'actionsPerSecondMax':max(t),'actionsPerSecondCi95':median_ci(t,seed+idx*11+4),'rejectionRateMedian':statistics.median(vals('rejectionRate')),'tickFractionMedian':statistics.median(vals('tickFraction')),'backlogSlopeMedian':statistics.median(vals('backlogSlope')),'sustainedRuns':sum(r['sustained'] for r in rows),'sustained':sum(r['sustained'] for r in rows)>=math.ceil(len(rows)/2)})
     return out
 def write_csv(path,groups):
-    fields=['runtime','sessions','n','actionP99Median','actionP99Min','actionP99Max','stepP99Median','stepP99Min','stepP99Max','cpuMedian','cpuMin','cpuMax','actionsPerSecondMedian','actionsPerSecondMin','actionsPerSecondMax','rejectionRateMedian','tickFractionMedian','backlogSlopeMedian','sustainedRuns','sustained']
+    fields=['runtime','sessions','n','actionP99Median','actionP99Min','actionP99Max','stepP99Median','stepP99Min','stepP99Max','cpuMedian','cpuMin','cpuMax','generatorCpuMedian','actionsPerSecondMedian','actionsPerSecondMin','actionsPerSecondMax','rejectionRateMedian','tickFractionMedian','backlogSlopeMedian','sustainedRuns','sustained']
     with Path(path).open('w',newline='',encoding='utf-8') as f:
         w=csv.DictWriter(f,fieldnames=fields);w.writeheader();[w.writerow({k:g[k] for k in fields}) for g in groups]
 def permutation_p(values,seed,rounds=10000):

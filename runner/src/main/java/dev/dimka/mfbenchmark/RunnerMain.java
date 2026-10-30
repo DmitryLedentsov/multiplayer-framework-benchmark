@@ -36,7 +36,7 @@ public final class RunnerMain {
         sleepSeconds(config.warmupSeconds());
         recorder.reset();
         long measurementStart = System.nanoTime();
-        sample(config, recorder, runtime, measurementStart);
+        double generatorCpuPercent = sample(config, recorder, runtime, generator, measurementStart);
         generator.close();
         double elapsed = (System.nanoTime() - measurementStart) / 1_000_000_000.0;
         MeasurementRecorder.Snapshot finalSnapshot = recorder.snapshot(cpuPercent(), heapUsed(), threadCount(), elapsed);
@@ -48,6 +48,7 @@ public final class RunnerMain {
         summary.put("config", config);
         summary.put("environment", environment());
         summary.put("metrics", finalSnapshot);
+        summary.put("generatorCpuPercent", generatorCpuPercent);
         MAPPER.writeValue(config.outputPath().resolve("summary.json").toFile(), summary);
       }
     } catch (Throwable failure) {
@@ -62,25 +63,61 @@ public final class RunnerMain {
     }
   }
 
-  private static void sample(BenchConfig config, MeasurementRecorder recorder, RuntimeAdapter runtime, long measurementStart) throws Exception {
+  private static double sample(BenchConfig config, MeasurementRecorder recorder, RuntimeAdapter runtime, ActionGenerator generator, long measurementStart) throws Exception {
     Path csv = config.outputPath().resolve("samples.csv");
+    var threadMx = ManagementFactory.getThreadMXBean();
+    if (threadMx.isThreadCpuTimeSupported() && !threadMx.isThreadCpuTimeEnabled()) {
+      threadMx.setThreadCpuTimeEnabled(true);
+    }
+    long generatorCpuStart = sumThreadCpu(threadMx, generator.threadIds());
     try (BufferedWriter writer = Files.newBufferedWriter(csv)) {
-      writer.write("elapsed_s,cpu_percent,heap_used_bytes,threads,offered,accepted,rejected,processed,backlog,actions_per_s,steps_per_s,action_p50_ms,action_p95_ms,action_p99_ms,step_p50_ms,step_p95_ms,step_p99_ms,pending_runtime\n");
+      writer.write("elapsed_s,cpu_percent,generator_cpu_percent,heap_used_bytes,threads,offered,accepted,rejected,processed,backlog,actions_per_s,steps_per_s,action_p50_ms,action_p95_ms,action_p99_ms,step_p50_ms,step_p95_ms,step_p99_ms,pending_runtime\n");
       long end = measurementStart + config.measurementSeconds() * 1_000_000_000L;
       while (System.nanoTime() < end) {
         Thread.sleep(config.sampleIntervalMs());
-        double elapsed = (System.nanoTime() - measurementStart) / 1_000_000_000.0;
+        long now = System.nanoTime();
+        double elapsed = (now - measurementStart) / 1_000_000_000.0;
+        double generatorCpu = normalizedThreadCpuPercent(
+            threadMx, generator.threadIds(), generatorCpuStart, now - measurementStart);
         MeasurementRecorder.Snapshot s = recorder.snapshot(cpuPercent(), heapUsed(), threadCount(), elapsed);
         writer.write(String.join(",",
-            f(elapsed), f(s.processCpuPercent()), Long.toString(s.heapUsedBytes()), Integer.toString(s.threadCount()),
+            f(elapsed), f(s.processCpuPercent()), f(generatorCpu),
+            Long.toString(s.heapUsedBytes()), Integer.toString(s.threadCount()),
             Long.toString(s.offeredActions()), Long.toString(s.acceptedActions()), Long.toString(s.rejectedActions()),
             Long.toString(s.processedActions()), Long.toString(s.backlog()), f(s.actionsPerSecond()), f(s.stepsPerSecond()),
-            f(s.actionP50Ms()), f(s.actionP95Ms()), f(s.actionP99Ms()), f(s.stepP50Ms()), f(s.stepP95Ms()), f(s.stepP99Ms()),
+            f(s.actionP50Ms()), f(s.actionP95Ms()), f(s.actionP99Ms()),
+            f(s.stepP50Ms()), f(s.stepP95Ms()), f(s.stepP99Ms()),
             Long.toString(runtime.pendingActions())));
         writer.write("\n");
         writer.flush();
       }
     }
+    long elapsedNanos = Math.max(1L, System.nanoTime() - measurementStart);
+    return normalizedThreadCpuPercent(
+        threadMx, generator.threadIds(), generatorCpuStart, elapsedNanos);
+  }
+
+  private static long sumThreadCpu(java.lang.management.ThreadMXBean bean, java.util.List<Long> ids) {
+    if (!bean.isThreadCpuTimeSupported()) return -1L;
+    long total = 0L;
+    for (long id : ids) {
+      long value = bean.getThreadCpuTime(id);
+      if (value > 0L) total += value;
+    }
+    return total;
+  }
+
+  private static double normalizedThreadCpuPercent(
+      java.lang.management.ThreadMXBean bean,
+      java.util.List<Long> ids,
+      long startCpu,
+      long elapsedNanos
+  ) {
+    if (startCpu < 0L || elapsedNanos <= 0L) return -1.0;
+    long current = sumThreadCpu(bean, ids);
+    if (current < 0L) return -1.0;
+    int processors = Math.max(1, Runtime.getRuntime().availableProcessors());
+    return Math.max(0.0, (current - startCpu) * 100.0 / elapsedNanos / processors);
   }
 
   private static String f(double value) { return String.format(java.util.Locale.ROOT, "%.6f", value); }
