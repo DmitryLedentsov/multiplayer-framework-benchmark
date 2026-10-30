@@ -339,11 +339,19 @@ def svg_plot(
         max_y = max(max_y, threshold)
     max_y = max(1.0, max_y * 1.12)
     min_x, max_x = min(xs), max(xs)
-    if min_x == max_x:
-        max_x += 1
+    single_x = min_x == max_x
+    if single_x:
+        # A single tested load point is not a scaling curve. Keep the real
+        # session value as the only tick, but center the point visually.
+        x_span = max(1.0, min_x * 0.10)
+        plot_min_x = min_x - x_span
+        plot_max_x = max_x + x_span
+    else:
+        plot_min_x = min_x
+        plot_max_x = max_x
 
     def px(x: float) -> float:
-        return left + (x - min_x) / (max_x - min_x) * (width - left - right)
+        return left + (x - plot_min_x) / (plot_max_x - plot_min_x) * (width - left - right)
 
     def py(y: float) -> float:
         return top + (1.0 - y / max_y) * (height - top - bottom)
@@ -381,10 +389,26 @@ def svg_plot(
         points = " ".join(f'{px(int(row["sessions"])):.2f},{py(float(row[metric])):.2f}' for row in runtime_rows)
         parts.append(f'<polyline points="{points}" fill="none" stroke="{color}" stroke-width="2.5"/>')
         for row in runtime_rows:
-            parts.append(f'<circle cx="{px(int(row["sessions"])):.2f}" cy="{py(float(row[metric])):.2f}" r="4" fill="{color}"/>')
+            point_x = px(int(row["sessions"]))
+            point_y = py(float(row[metric]))
+            parts.append(f'<circle cx="{point_x:.2f}" cy="{point_y:.2f}" r="5" fill="{color}"/>')
+            if len(xs) == 1:
+                value = float(row[metric])
+                label = f"{value:.3f}" if abs(value) < 1.0 else f"{value:.2f}"
+                parts.append(
+                    f'<text x="{point_x+9:.2f}" y="{max(top+12, point_y-8):.2f}" '
+                    f'font-family="sans-serif" font-size="11" fill="#111827">{label}</text>'
+                )
         legend_x = left + index * 160
         parts.append(f'<line x1="{legend_x}" y1="{height-42}" x2="{legend_x+24}" y2="{height-42}" stroke="{color}" stroke-width="3"/>')
         parts.append(f'<text x="{legend_x+30}" y="{height-38}" font-family="sans-serif" font-size="11">{runtime}</text>')
+
+    if len(xs) == 1:
+        parts.append(
+            f'<text x="{width/2}" y="{height-bottom+42}" text-anchor="middle" '
+            f'font-family="sans-serif" font-size="10" fill="#6b7280">'
+            'single load point; run 2+ session levels for a scaling curve</text>'
+        )
 
     parts.append("</svg>")
     path.parent.mkdir(parents=True, exist_ok=True)
