@@ -1,0 +1,21 @@
+flowchart LR
+  U[Developer / researcher] -->|HTTP| UI[Benchmark Web UI / Controller]
+  UI -->|spawn fresh JVM per repetition| R[Java Benchmark Runner]
+  R --> LG[Action Generator]
+  LG --> SUT{Runtime adapter}
+  SUT --> MF[Multiplayer Framework]
+  SUT --> S1[S1 executor/session]
+  SUT --> S2[S2 shared pool + serial queue]
+  SUT --> PK[Apache Pekko actors]
+  MF --> M[Metrics recorder]
+  S1 --> M
+  S2 --> M
+  PK --> M
+  M --> RAW[(samples.csv + summary.json)]
+  UI --> MAN[(manifest.json + status.json)]
+  RAW --> AN[analysis.py]
+  MAN --> AN
+  AN --> REP[(analysis.json + analysis.csv)]
+  RAW --> HASH[SHA-256 checksums]
+  MAN --> HASH
+  REP --> HASH
