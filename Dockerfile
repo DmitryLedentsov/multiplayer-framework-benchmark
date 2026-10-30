@@ -5,7 +5,7 @@ COPY runner/pom.xml runner/pom.xml
 COPY runner/src runner/src
 RUN --mount=type=secret,id=maven_settings,target=/run/secrets/maven_settings,required=true \
     mvn --settings /run/secrets/maven_settings -f runner/pom.xml \
-      --batch-mode --no-transfer-progress --update-snapshots clean test package
+      --batch-mode --no-transfer-progress --update-snapshots -Pframework clean test package
 
 FROM eclipse-temurin:17-jre-jammy
 RUN apt-get update \

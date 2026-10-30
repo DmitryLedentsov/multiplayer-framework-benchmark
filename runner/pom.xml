@@ -27,11 +27,6 @@
 
   <dependencies>
     <dependency>
-      <groupId>com.mf</groupId>
-      <artifactId>mf-game-service-starter</artifactId>
-      <version>${mf.version}</version>
-    </dependency>
-    <dependency>
       <groupId>org.apache.pekko</groupId>
       <artifactId>pekko-actor_${scala.binary.version}</artifactId>
       <version>${pekko.version}</version>
@@ -58,6 +53,38 @@
       <scope>test</scope>
     </dependency>
   </dependencies>
+
+  <profiles>
+    <profile>
+      <id>framework</id>
+      <dependencies>
+        <dependency>
+          <groupId>com.mf</groupId>
+          <artifactId>mf-game-service-starter</artifactId>
+          <version>${mf.version}</version>
+        </dependency>
+      </dependencies>
+      <build>
+        <plugins>
+          <plugin>
+            <groupId>org.codehaus.mojo</groupId>
+            <artifactId>build-helper-maven-plugin</artifactId>
+            <version>3.6.1</version>
+            <executions>
+              <execution>
+                <id>add-framework-adapter</id>
+                <phase>generate-sources</phase>
+                <goals><goal>add-source</goal></goals>
+                <configuration>
+                  <sources><source>src/framework/java</source></sources>
+                </configuration>
+              </execution>
+            </executions>
+          </plugin>
+        </plugins>
+      </build>
+    </profile>
+  </profiles>
 
   <build>
     <plugins>

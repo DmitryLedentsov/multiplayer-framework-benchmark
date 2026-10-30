@@ -17,7 +17,11 @@ import com.mf.sdk.Tick;
 import java.util.ArrayList;
 import java.util.List;
 
-final class MfRuntime implements RuntimeAdapter {
+/**
+ * Adapter that executes the real Multiplayer Framework worker/actor runtime.
+ * This source is included only by Maven profile "framework" because the SUT package is private.
+ */
+public final class MfRuntime implements RuntimeAdapter {
   private final BenchConfig config;
   private final MeasurementRecorder recorder;
   private final ObjectMapper mapper = new ObjectMapper();
@@ -25,7 +29,7 @@ final class MfRuntime implements RuntimeAdapter {
   private final List<Thread> workerThreads = new ArrayList<>();
   private final List<GameSessionActor> actors = new ArrayList<>();
 
-  MfRuntime(BenchConfig config, MeasurementRecorder recorder) {
+  public MfRuntime(BenchConfig config, MeasurementRecorder recorder) {
     this.config = config;
     this.recorder = recorder;
   }

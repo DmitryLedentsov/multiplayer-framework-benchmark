@@ -87,6 +87,7 @@ public final class RunnerMain {
   private static void sleepSeconds(int seconds) throws InterruptedException { if (seconds > 0) Thread.sleep(seconds * 1_000L); }
   private static long heapUsed() { Runtime r = Runtime.getRuntime(); return r.totalMemory() - r.freeMemory(); }
   private static int threadCount() { return ManagementFactory.getThreadMXBean().getThreadCount(); }
+
   private static double cpuPercent() {
     var os = ManagementFactory.getOperatingSystemMXBean();
     if (os instanceof com.sun.management.OperatingSystemMXBean sun) {
@@ -107,13 +108,18 @@ public final class RunnerMain {
     env.put("availableProcessors", Runtime.getRuntime().availableProcessors());
     env.put("maxHeapBytes", Runtime.getRuntime().maxMemory());
     env.put("inputArguments", ManagementFactory.getRuntimeMXBean().getInputArguments());
-    env.put("frameworkPackageVersion", versionOf(com.mf.gameserver.runtime.worker.GameWorker.class));
-    env.put("pekkoPackageVersion", versionOf(org.apache.pekko.actor.ActorSystem.class));
+    env.put("frameworkPackageVersion", versionOf("com.mf.gameserver.runtime.worker.GameWorker"));
+    env.put("pekkoPackageVersion", versionOf("org.apache.pekko.actor.ActorSystem"));
     return env;
   }
 
-  private static String versionOf(Class<?> type) {
-    String version = type.getPackage().getImplementationVersion();
-    return version == null ? "unknown" : version;
+  private static String versionOf(String className) {
+    try {
+      Class<?> type = Class.forName(className);
+      String version = type.getPackage().getImplementationVersion();
+      return version == null ? "unknown" : version;
+    } catch (ClassNotFoundException e) {
+      return "not-packaged";
+    }
   }
 }
